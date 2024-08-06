@@ -3,23 +3,43 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Search Pictures</title>
-    <link rel="stylesheet" href="./css/main.css" />
+    <title>Gallery</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Montserrat:ital,wght@0,100..900;1,100..900&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="./css/styles.css" />
   </head>
   <body>
-    <div class="container">
-      <div class="form-container">
-        <form action="form" class="form">
-          <input type="text" name="input" placeholder="Search images..." />
-          <button type="submit" class="search-button">Search</button>
-        </form>
-      </div>
-      <span class="loader"></span>
-      <div class="gallery-container">
-        <ul class="gallery"></ul>
-        <button type="button" class="load-more-button">Load more...</button>
-      </div>
+    <form class="loadin-form js-form-container">
+      <label>
+        <input
+          class="input-text"
+          type="text"
+          name="search"
+          placeholder="Search images..."
+        />
+      </label>
+
+      <button class="form-btn" type="submit">Search</button>
+    </form>
+
+    <ul class="gallery js-gallery"></ul>
+
+    <div class="wrap-loader">
+      <span class="loader js-loader"></span>
     </div>
-    <script src="./main.js" type="module"></script>
+    <div class="btn-primary-container">
+      <button
+        type="button"
+        class="btn-primary is-hidden"
+        data-action="load-more"
+      >
+        <span class="label-btn-primary">Load more</span>
+      </button>
+    </div>
+    <script type="module" src="./main.js"></script>
   </body>
 </html>

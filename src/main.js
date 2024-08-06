@@ -1,124 +1,131 @@
-import createHttpRequest from './js/pixabay-api.js';
-import addImagesToHtml from './js/render-functions.js';
+'use strict';
+
 import iziToast from 'izitoast';
 import 'izitoast/dist/css/iziToast.min.css';
 
-const form = document.querySelector('.form');
-const loader = document.querySelector('.loader');
-const gallery = document.querySelector('.gallery');
-const loadMoreButton = document.querySelector('.load-more-button');
+import { searchImagesByQuery } from './js/pixabay-api.js';
+import { createMarkupImages, clearGallery } from './js/render-functions.js';
+import { toggleLoader } from './js/loader.js';
+import ButtonService from './js/loadMoreService.js';
+import { getAdapter } from 'axios';
 
-const KEY = '45071357-999033ebbf151b40dc2c05ece';
-let currentPage = 1;
-let searchQuery = '';
-let totalHits = 0;
-let totalPagesToLoad = 0;
+const loadMoreBtnElement = document.querySelector('.btn-primary');
+const loadMoreBtn = new ButtonService(loadMoreBtnElement, 'is-hidden');
+loadMoreBtn.hide();
 
-form.addEventListener('submit', searchImagesFu);
-loadMoreButton.addEventListener('click', loadMoreImages);
+const params = {
+    q: '',
+    page: 1,
+    per_page: 15,
+    maxPage: 0,
+};
 
-async function searchImagesFu(event) {
-  event.preventDefault();
+const searchForm = document.querySelector('.js-form-container');
+searchForm.addEventListener('submit', searchFoto);
 
-  searchQuery = form.elements.input.value.trim();
-  currentPage = 1;
-  gallery.innerHTML = '';
+async function searchFoto(event) {
+    event.preventDefault();
+    clearGallery();
+    const form = event.currentTarget;
+    params.q = form.elements.search.value.toLowerCase().trim();
 
-  if (searchQuery === '' || searchQuery.length < 2) {
-    iziToast.error({
-      title: '',
-      message: 'The input field is empty or has less than two characters!',
-    });
-    loadMoreButton.style.display = 'none';
-    return;
-  }
-
-  loader.classList.remove('hidden');
-
-  const options = {
-    params: {
-      key: KEY,
-      q: searchQuery,
-      image_type: 'photo',
-      orientation: 'horizontal',
-      page: currentPage,
-      per_page: 15,
-    },
-  };
-
-  try {
-    const data = await createHttpRequest(options);
-    loader.classList.add('hidden');
-
-    if (data.hits.length === 0) {
-      iziToast.error({
-        title: '',
-        message: 'No pictures found! Try again!',
-      });
-      loadMoreButton.style.display = 'none';
-    } else {
-      addImagesToHtml(data.hits);
-      loadMoreButton.classList.remove('hidden');
-      totalHits = data.totalHits;
-      totalPagesToLoad = Math.ceil(totalHits / 15);
-
-      if (totalPagesToLoad > 1) {
-        loadMoreButton.style.display = 'block';
-      } else {
-        loadMoreButton.style.display = 'none';
-      }
+    if (!params.q) {
+        loadMoreBtn.hide();
+        iziToast.error({
+            message: 'Please enter the data in the input field',
+            position: 'topRight',
+            messageColor: '#ffffff',
+            backgroundColor: '#EF4040',
+        });
+        toggleLoader(false);
+        return;
     }
-  } catch (error) {
-    loader.classList.add('hidden');
-    iziToast.error({
-      title: '',
-      message: `Error fetching images: ${error.message || error}`,
-    });
-  } finally {
-    form.reset();
-  }
+
+    params.page = 1;
+    loadMoreBtn.show();
+    loadMoreBtn.disable();
+
+    try {
+        toggleLoader(true);
+        const { total, hits } = await searchImagesByQuery(params);
+        params.maxPage = Math.ceil(total / params.per_page);
+
+        if (params.maxPage > 1) {
+            loadMoreBtn.enable();
+            loadMoreBtnElement.addEventListener('click', handleLoadMore);
+        } else {
+            loadMoreBtn.hide();
+        }
+        if (!hits.length) {
+            loadMoreBtn.hide();
+            iziToast.error({
+                message: `Sorry, there was an error fetching the images. Please try again later!`,
+                position: 'topRight',
+                messageColor: '#ffffff',
+                backgroundColor: '#EF4040',
+            });
+            return;
+        }
+
+        createMarkupImages(hits);
+
+    } catch (err) {
+        iziToast.error({
+            message: 'Sorry, there are no images matching your search',
+            position: 'topRight',
+            messageColor: '#ffffff',
+            backgroundColor: '#EF4040',
+        });
+
+    } finally {
+        toggleLoader(false);
+        if (params.page === params.maxPage) {
+            loadMoreBtn.hide();
+            loadMoreBtnElement.removeEventListener('click', handleLoadMore);
+        } else {
+            loadMoreBtn.enable();
+        }
+        form.reset();
+    }
 }
 
-async function loadMoreImages() {
-  loader.classList.remove('hidden');
-  currentPage += 1;
+async function handleLoadMore() {
+    loadMoreBtn.disable();
+    params.page += 1;
 
-  const options = {
-    params: {
-      key: KEY,
-      q: searchQuery,
-      image_type: 'photo',
-      orientation: 'horizontal',
-      page: currentPage,
-      per_page: 15,
-    },
-  };
+    try {
+        toggleLoader(true);
+        const { hits } = await searchImagesByQuery(params);
+        createMarkupImages(hits);
 
-  try {
-    const data = await createHttpRequest(options);
-    loader.classList.add('hidden');
+        let elem = document.querySelector('.scrol');
+        let rect = elem.getBoundingClientRect();
 
-    addImagesToHtml(data.hits);
+        window.scrollBy({
+            top: rect.height * 2,
+            left: rect.width,
+            behavior: 'smooth',
+        });
 
-    const galleryItem = document.querySelector('.gallery li');
-    const galleryItemParams = galleryItem.getBoundingClientRect();
-    window.scrollBy({
-      top: galleryItemParams.height * 2,
-      behavior: 'smooth',
-    });
-  } catch (error) {
-    loader.classList.add('hidden');
-    iziToast.error({
-      title: '',
-      message: `Error fetching images: ${error.message || error}`,
-    });
-  } finally {
-    if (currentPage >= totalPagesToLoad) {
-      loadMoreButton.style.display = 'none';
-      iziToast.info({
-        title: '',
-        message: "We're sorry, but you've reached the end of search results.",
-      });
+        // console.log(rect.height);
+
+    } catch (error) {
+        console.log(error);
+    } finally {
+        toggleLoader(false);
+        if (params.page >= params.maxPage) {
+            loadMoreBtn.hide();
+            iziToast.info({
+                message: 'You have reached the end of search results.',
+                position: 'topRight',
+                messageColor: '#ffffff',
+                backgroundColor: '#4e75ff',
+            });
+
+            loadMoreBtn.hide();
+            loadMoreBtnElement.removeEventListener('click', handleLoadMore);
+        } else {
+            loadMoreBtn.enable();
+        }
     }
-  }
 }
